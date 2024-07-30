@@ -1,0 +1,788 @@
+---
+title: 'Mineria de dades: Earthquakes Part 1'
+output:
+  html_document:
+    highlight: default
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+    toc_depth: 2
+---
+
+
+# Introducció
+
+Aquest és un exercici de mineria de dades sobre l'estudi dels terratrèmols o activitat sísmica global, és a dir plantegem l'**estudi de l'activitat sísmica mundial**.
+
+Disposar d'un bon conjunt de dades i un bon coneixement del camp del que volem fer l'estudi ajuda a fer-se bones preguntes i a orientar-se cap a l'objectiu on es vol arribar. En aquest cas, no disposo d'un bon coneixement de geologia i les dades...ja veurem, però sí que personalment, crec és un tema interessant i val la pena dedicar-li aquesta pràctica. 
+
+# Elecció del conjunt de dades
+
+Comencem doncs amb un joc de dades procedents de [Kaggle](https://www.kaggle.com/), en particular: 
+
+  - https://www.kaggle.com/datasets/mohitkr05/global-significant-earthquake-database-from-2150bc
+
+Aquest dataset que hem triat, *Global Significant Earthquake Database from 2150BC*, és un llistat d'uns 6000 terratrèmols que van del 2150 BC fins a l'actualitat. Això ja ens diu de bones a primeres que les dades prèvies a l'ús d'instruments i recull de dades, probablement són incompletes. De fet, ja avanço que aquest conjunt de dades és altament incomplet. 
+
+# Objectius
+
+Com a objectiu general, volem mostrar quines són les zones i països amb més activitat sísmica i perill de tsunamis i el seu impacte en aquestes àrees, això posarà de manifest l'estructura, posició i dinàmica de les plaques tectòniques i a la vegada les possibles conseqüències per la població. Volem veure quins països són els més actius sísmicament. També volem fer una classificació i veure què fa que un terratrèmol sigui devastador, (significant). Intentarem esbrinar relacions o correlacions entre magnitud del sisme, profunditat a la que es produeix i altres variables.
+El valor d'aquestes dades pot ajudar a minimitzar conseqüències o a preveure i millorar infraestructures. De totes maneres com s'ha vist sempre, les àrees amb menys recursos i més pobres són les més damnificades.
+
+# Inspecció de les dades
+
+```{r message=FALSE}
+library(tidyverse)
+```
+
+El primer que fem és carregar les dades i fer una ullada per veure de quantes variable, de quin tipus són i de quants registres disposem.
+```{r}
+dades <- read_csv('Worldwide-Earthquake-database.csv')
+glimpse(dades)
+```
+
+Com podem veure, tenim 6193 registres i 47 variables. Aquestes dades, inclouen dades que es remonten a l'any 2150 BC fins a l'actualitat. **Observem** la quantitat de NA's que hi ha!.  
+
+Fem una descripció d'aquestes variables, (https://medium.com/@dmukherjeetextiles/significant-earthquakes-2150-bc-to-2023-ad-e550c60fe863):
+
+  - **I_D** (numèric): identificació del terratrèmol.
+  
+**DIMENSIONS TEMPORALS**
+
+  - **YEAR** (numèric): any del terratrèmol, (negatiu per dates BC).
+  - **MONTH** (numèric): mes del terratrèmol.
+  - **DAY** (numèric): dia del terratrèmol.
+  - **HOUR** (numèric): hora del terratrèmol
+  - **MINUTE** (numèric): minut del terratrèmol
+  - **SECOND** (numèric): segon del terratrèmol
+  
+**DIMENSIONS QUE DESCRIUEN LES CARACTERÍSTIQUES**
+
+  - **FLAG_TSUNAMI** (text): ens diu si es va registrar un tsunami (pren valors *Yes* i *No*).
+  - **FOCAL_DEPTH** (numèric): profunditat del terratrèmol, (mesurat en km i pren valors de 0 a 700).
+  - **EQ_PRIMARY** (numèric): valor de la magnitud del terratrèmol, es tria segons la disponibilitat de les dades en el següent ordre:  Magnitud Mw, Magnitud Ms, Magnitud Mb, Magnitud Ml, Magnitud Mfa, Magnitud Desconeguda.
+  - **EQ_MAG_MW** (numèric): valor de la magnitud basat en l'escala de magnitud del moment, (pren valors entre 0 i 9.9).
+  - **EQ_MAG_MS** (numèric): magnitud de l'ona superficial, (pren valors entre 0 i 9.9).
+  - **EQ_MAG_MB** (numèric): magnitud de l'ona corporal de compressió (ona P), (pren valors entre 0 i 9.9).
+  - **EQ_MAG_ML** (numèric): és la relació de magnitud original definida per Richter i Gutenberg per als terratrèmols locals el 1935, (pren valors entre 0 i 9.9).
+  - **EQ_MAG_MFA** (numèric): magnituds calculada a partir de la *felt area*, per als terratrèmols anteriors a l'ús d'instruments sísmics, (pren valors entre 0 i 9.9).
+  - **EQ_MAG_UNK** (numèric): magnitud desconeguda, no determinable a partir de fonts registrades, (pren valors entre 0 i 9.9).
+  - **INTENSITY** (numèric): efecte d'un terratrèmol a la superfície de la Terra. La intensitat de Mercalli modificada (MMI) es dóna en números romans (convertits en números a la base de dades digital).
+  
+**DIMENSIONS GEOGRÀFIQUES**
+
+  - **COUNTRY** (text): nom del país on va succeir el terratrèmol.
+  - **STATE** (text): estat, província o prefectura on va succeir el terratrèmol.
+  - **LOCATION_NAME** (text): lloc on va succeir el terratrèmol, (ciutat, estat o illa).
+  - **LATITUDE** (numèric): latitud on va succeir el terratrèmol.
+  - **LONGITUDE** (numèric): longitud on va succeir el terratrèmol.
+  - **REGION_CODE** (numèric): límits regionals assignats segons de la freqüència sísmica, les relacions geofísiques, el risc en zones llunyanes i la justificació política. Els codis es defineixen com: 10 = Central, Western and S. Africa, 15 = Northern Africa, 20 = Antarctica, 30 = East Asia, 40 = Central Asia and Caucasus, 50 = Kamchatka and Kuril Islands, 60 = S. and SE. Asia and Indian Ocean, 70 = Atlantic Ocean, 80 = Bering Sea, 90 = Caribbean, 100 = Central America, 110 = Eastern Europe, 120 = Northern and Western Europe, 130 = Southern Europe, 140 = Middle East, 150 = North America and Hawaii, 160 = South America, 170 = Central and South Pacific.
+  
+**DIMENSIONS QUE INDIQUEN CONSEQÜÈNCIES HUMANES I MATERIALS**
+
+  - **DEATHS** (numèric): nombre de morts, pot incloure morts causades per efectes secundaris com ara per tsunamis.
+  - **DEATHS_DESCRIPTION** (numèric): descripció de morts, s'indica amb valors entre 0 i 4 segons: 0 = Cap, 1 = Poques (de 1 a 50 morts), 2 = Algunes (de 51 a 100 defuncions), 3 = Moltes (de 101 a 1.000 defuncions), 4 = Moltíssims (de 1.001 o més morts).
+  - **MISSING** (numèric): nombre de desapareguts, pot incloure desapareguts causats per efectes secundaris com ara per tsunamis.
+  - **MISSING_DESCRIPTION** (numèric): descripció de desapareguts, s'indica amb valors entre 0 i 4 segons: 0 = Cap, 1 = Pocs (de 1 a 50 desapareguts), 2 = Alguns (de 51 a 100 desapareguts), 3 = Molts (de 101 a 1.000 desapareguts), 4 = Moltíssims (de 1.001 o més desapareguts).
+  - **INJURIES** (numèric): nombre de lesions, pot incloure lesions causades per efectes secundaris com ara per tsunamis.
+  - **INJURIES_DESCRIPTION** (numèric):descripció de lesions, s'indica amb valors entre 0 i 4 segons: 0 = Cap, 1 = Poques (de 1 a 50 lesions), 2 = Algunes (de 51 a 100 lesions), 3 = Moltes (de 101 a 1.000 lesions), 4 = Moltíssims (de 1.001 o més lesions).
+  - **DAMAGE_MILLIONS_DOLLARS** (numèric):danys en milions de dolars, (el valor del dolar és el del moment del terratrèmol.
+  - **DAMAGE_DESCRIPTION** (numèric): valor descriptiu dels danys per aquells registres que no tenen una valoració. Els valors que pren són: 0 = NONE, 1 = LIMITED (menys de 1 milió), 2 = MODERATE (1 ta 5 milions), 3 = SEVERE (5 a 24 milions), 4 = EXTREME (25 milions o més).
+  - **HOUSES_DESTROYED** (numèric): nombre d'habitatges destruïts, inclou els destruïts per efectes secundaris.
+  - **HOUSES_DESTROYED_DESCRIPTION** (numèric): descripció del nivell de destrucció d'habitatges: 0 = Cap, 1 = Poques (de 1 a 50 cases), 2 = Algunes (de 51 a 100 cases), 3 = Moltes (de 101 a 1000 cases), 4 = Moltíssimes (de 1001 o més cases)
+  - **HOUSES_DAMAGED** (numèric): nombre d'habitatges danyats, inclou els danyats per efectes secundaris.
+  - **HOUSES_DAMAGED_DESCRIPTION** (numèric): descripció del nivell de dany d'habitatges: 0 = Cap, 1 = Poques (de 1 a 50 cases), 2 = Algunes (de 51 a 100 cases), 3 = Moltes (de 101 a 1000 cases), 4 = Moltíssimes (de 1001 o més cases)
+  
+La resta són totals que de valors que ja s'han descrit anteriorment.
+
+  - **TOTAL_DEATHS** (numèric)
+  - **TOTAL_DEATHS_DESCRIPTION** (numèric)
+  - **TOTAL_MISSING** (numèric)
+  - **TOTAL_MISSING_DESCRIPTION** (numèric)
+  - **TOTAL_INJURIES** (numèric)
+  - **TOTAL_INJURIES_DESCRIPTION** (numèric)
+  - **TOTAL_DAMAGE_MILLIONS_DOLLARS** (numèric)
+  - **TOTAL_DAMAGE_DESCRIPTION** (numèric)
+  - **TOTAL_HOUSES_DESTROYED** (numèric)
+  - **TOTAL_HOUSES_DESTROYED_DESCRIPTION** (numèric)
+  - **TOTAL_HOUSES_DAMAGED** (numèric)
+  - **TOTAL_HOUSES_DAMAGED_DESCRIPTION** (numèric)
+
+Les dades que farem servir un moment o altre són: YEAR, MONTH, DAY, HOUR, FLAG_TSUNAMI, FOCAL_LENGTH, EQ_PRIMARY, INTENSITY, COUNTRY, LOCATION_NAME, LATITUDE, LONGITUDE, DEATHS, DEATHS_DESCRIPTION, DAMAGE_MILLIONS_DOLLARS, DAMAGE_DESCRIPTION.
+
+# Preprocessament i gestió de característiques
+
+Podem fer una primera ullada i mirar com es distribueixen les dades recollides al llarg dels anys.
+```{r}
+ggplot(dades, 
+       aes(x = YEAR)
+       ) + 
+  geom_histogram(binwidth = 2,
+           color = "darkred",
+           fill = "darkred" )
+```
+
+Podem veure que en temps més recents tenim més dades. Això és raonable ja que a mida que tirem enrere tenim menys informació de les variables.
+
+## Neteja
+
+Si mirem els valors NA:
+```{r}
+print('NA')
+colSums(is.na(dades))
+```
+
+Podem veure que hi ha moltíssims valors NA, algunes variables d'entrada són inservibles, d'altres pràcticament el 50% dels seus valors són nuls, d'altres ronda el 20% i poques es podríen netejar directament. Només FLAG_TSUNAMI, YEAR i COUNTRY estan netes, (3 de 47 !).
+Amb aquest panorama, si féssim una neteja com cal ens quedaríem a les fosques.
+Per tant decidim netejar algunes variables i conviure amb NA's d'algunes altres, ho veurem tot seguit.
+
+Abans que res, eliminem les darreres 16 variables que no farem servir per res i estan plegades de valors nuls.
+```{r}
+dades <- dades |> 
+  select(1:31)
+```
+
+Després d'anar comprovant com disminueix el nombre de registres(files), fem el següent:
+
+  - Eliminem les dades anteriors al 1900. És a dir, considerem l'activitat sísmica del 1900 endavant.
+  - Tenint en compte les variables que més ens interessen, netegem els camps: FOCAL_DEPTH (profunditat), EQ_PRIMARY (magnitud), HOUR (hora) i DEATHS (nombre de morts).
+
+```{r}
+dades_1900 <- dades |> 
+  filter(YEAR >= 1900)
+
+dades_netes <- dades_1900 |>
+  filter(YEAR >= 1900 & !is.na(FOCAL_DEPTH) & !is.na(EQ_PRIMARY) & !is.na(HOUR) & !is.na(DEATHS) & !is.na(DAMAGE_DESCRIPTION))
+```
+
+Podem fer un resum de com ens ha quedat el nostre dataset, (ho farem usant la llibreria `skimr`,  
+https://search.r-project.org/CRAN/refmans/skimr/html/skim.html).
+```{r}
+library(skimr)
+
+skim_without_charts(dades_netes)
+```
+
+Les dades s'han reduït de 6193 a 1135 registres, (això és considerable i potser segons com pot donar lloc a dades esbiaxades, però pels nostres objectius considerem que no).
+
+**Nota:** les dades que tenim del 1900 endavant (`dades_1900`), sense netejar són 3720 registres, les farem servir en algunes visualitzacions, així tindrem més punts representatius, ara bé pel cas de l'estudi PCA necessitarem les dades amb NA's a zero ja que sinó tenim problemes. 
+
+Per les dades que es mostren no s'observen *outliers*, en el sentit de dades fora del seu rang, i tampoc tenim dades repetides. Podem visualitzar les distribucions de diferents variables:
+
+```{r message=FALSE}
+library(cowplot)
+```
+
+```{r warning=FALSE}
+anys <- ggplot(dades_netes, 
+                    aes(x = YEAR)) +
+  geom_bar(color = "black", fill = "cornflowerblue")
+
+mesos <- ggplot(dades_netes, aes(x = MONTH)) +
+  geom_bar(color = "black", fill = "cornflowerblue")
+
+plot_grid(anys, mesos)
+
+
+dies <- ggplot(dades_netes, 
+                    aes(x = DAY)) +
+  geom_bar(color = "black", fill = "cornflowerblue")
+
+hores <- ggplot(dades_netes, aes(x = HOUR)) +
+  geom_bar(color = "black", fill = "cornflowerblue")
+
+plot_grid(dies, hores)
+
+profunditat <- ggplot(dades_netes, 
+                    aes(x = FOCAL_DEPTH)) +
+  geom_bar(color = "black", fill = "cornflowerblue")
+
+magnitud <- ggplot(dades_netes, aes(x = EQ_PRIMARY)) +
+  geom_bar(color = "black", fill = "cornflowerblue")
+
+plot_grid(profunditat, magnitud)
+
+morts <- ggplot(dades_netes, 
+                    aes(x = DEATHS)) +
+  geom_bar(color = "black", fill = "cornflowerblue")
+
+danys <- ggplot(dades_netes, aes(x = DAMAGE_MILLIONS_DOLLARS)) +
+  geom_bar(color = "black", fill = "cornflowerblue")
+
+plot_grid(morts, danys)
+```
+
+Podem veure com més cap a l'actualitat tenim més dades, no s'observa cap mes, dia o hora preferents en que es produeixin més terratrèmols, (es podria mirar de veure si el nombre de morts estan relacionats amb l'hora del dia en que s'ha produït el sisme).  
+En quant a la profunditat i magnitud, podria semblar que tenim *outliers*, però els valors estan a dins dels establerts i a part recordem que hem fet una neteja exhaustiva.
+
+## Anàlisi i visualització
+
+La distribució de terratrèmols, tenint en compte la magnitud. (Ho representem en un mapa, per fer-lo més gran fem servir:  
+https://ggplot2-book.org/maps.html, https://www.tidyverse.org/blog/2020/08/taking-control-of-plot-scaling/) :
+```{r message=FALSE}
+library(maps)
+```
+
+```{r}
+world <- map_data('world') 
+
+title <- "Mapa de Terratrèmols segons la magnitud"
+wr <- map_data("world")
+
+p <- ggplot(dades_1900) + 
+  geom_map(data = world, map = world, 
+           aes(map_id = region), 
+           fill="white", 
+           colour="#7f7f7f") +
+  expand_limits(x = world$long, y = world$lat) +
+  geom_point(aes(x = LONGITUDE, y = LATITUDE, color = EQ_PRIMARY),
+             size = 1) + 
+  ggtitle(title) +
+  labs(x = "Longitud", y = "Latitud", color = "Magnitud") +
+  scale_colour_gradient(high = "#132B43", low = "lightblue")
+
+pngfile <- fs::path(knitr::fig_path(),  "mapa1.png")
+
+library(ragg)
+agg_png(pngfile, width = 25, height = 12, units = "cm", res = 300)
+plot(p)
+invisible(dev.off())
+knitr::include_graphics(pngfile)
+```
+
+Aquest mapa mostra l'activitat sísmica més significativa. Es pot veure com els punts estan alineats indicant els límits de les plaques tectòniques.
+
+Considerem ara la presència de tsunamis:
+```{r}
+dades_1900$tsunami <- ifelse(dades_1900$FLAG_TSUNAMI %in% c("Yes"), "Yes", "No")
+counts <- table(dades_1900$tsunami)
+
+barplot(prop.table(counts), 
+        col = c("cornflowerblue","darkred"), 
+        main="Terratèmols i tsunamis", 
+        legend.text=c("No Tsunami","Sí Tsunami"),
+        xlab ="Tsunamis", ylab = "Percentatge",
+        ylim=c(0,0.8))
+```
+
+S'observa que un 75% dels terratrèmols de les nostres dades no provoquen tsunamis, mentre que un 25% sí. Això pot indicar que una gran part dels sismes es produeixen a zones terrestres i l'altre restant en zones costeres o marítimes.
+
+Això ho podem representar de nou en un mapa.
+```{r}
+world <- map_data('world') 
+
+title <- "Mapa de Terratrèmols segons la presència de tsunamis"
+wr <- map_data("world")
+
+p <- ggplot(dades_1900) + 
+  geom_map(data = world, map = world, 
+           aes(map_id = region), 
+           fill="white", 
+           color="#7f7f7f") +
+  expand_limits(x = world$long, y = world$lat) +
+  geom_point(aes(x = LONGITUDE, y = LATITUDE, color = FLAG_TSUNAMI),
+             size = 1) + 
+  ggtitle(title) +
+  labs(x = "Longitud", y = "Latitud", color = "Hi ha hagut tsunami?")
+
+pngfile <- fs::path(knitr::fig_path(),  "mapa2.png")
+
+agg_png(pngfile, width = 25, height = 12, units = "cm", res = 300)
+plot(p)
+invisible(dev.off())
+knitr::include_graphics(pngfile)
+```
+
+Podem mirar les morts provocades pels terratrèmols que produeixen tsunami o no. 
+```{r}
+death_ts <- dades_1900 |> 
+  filter(FLAG_TSUNAMI == "Yes")
+death_nts <- dades_1900 |> 
+  filter(FLAG_TSUNAMI == "No")
+par(mfcol = c(1, 2))
+hist(death_ts$DEATHS, breaks = 50, main = "Morts amb tsunami", xlab = "Nombre de morts", col = "cornflowerblue")
+hist(death_nts$DEATHS, breaks = 50, main = "Morts sense tsunami", xlab = "Nombre de morts", col = "cornflowerblue")
+```
+
+Com és d'esperar, segons els resultats anteriors, les morts per sismes sense tsunami són d'un ordre de magnitud més gran. S'observa també que tot i que els grans terratrèmols provoquen gran quantitat de morts, (tant si hi ha tsunami o no), sempre hi ha un mínim de morts acumulats a quantitats més petites.
+
+Si mirem els morts considerant la magnitud del terratrèmol:
+```{r}
+graph1 <- ggplot(dades_netes,
+       aes(x = EQ_PRIMARY, y = DEATHS)) +
+  geom_point(color = "darkred") + 
+  labs(x = "Magnitud", y = "Nombre de morts")
+
+graph2 <- ggplot(dades_netes,
+       aes(x = EQ_PRIMARY, y = DEATHS_DESCRIPTION)) +
+  geom_point(color = "darkred") + 
+  labs(x = "Magnitud", y = "Grup de mortalitat")
+```
+
+```{r message=FALSE}
+# https://ggplot2-book.org/arranging-plots
+library(patchwork)
+graph1 + graph2
+```
+
+Podem veure, complementant el resultat anterior, que la mortalitat s'incrementa amb la magnitud del terratrèmol, tot i que aquest resultat també posa de manifest que la densitat de població és un factor que incideix en la mortalitat, això es pot veure amb la presència de sismes de gran magnitud i pocs morts. (Recordem que els grups de mortalitat són: 0 = Cap, 1 = Poques, 2 = Algunes, 3 = Moltes i 4 = Moltíssims).
+
+Podem mirar la magnitud dels terratrèmols que provoquen tsunami i els que no en provoquen.
+```{r message=FALSE}
+mag_tsu <- dades_netes  |>
+ filter(FLAG_TSUNAMI == "Yes")
+
+mag_no_tsu <- dades_netes  |>
+ filter(FLAG_TSUNAMI == "No")
+
+g1 <- ggplot(mag_tsu, 
+        aes( x = EQ_PRIMARY)) + 
+   geom_bar(color = "black", fill = "cornflowerblue") +
+   labs(title = "Magnitud amb tsunami", 
+        x = "Magnitud")
+
+g2 <- ggplot(mag_no_tsu, 
+        aes( x = EQ_PRIMARY)) + 
+   geom_bar(color = "black", fill = "cornflowerblue") +
+   labs(title = "Magnitud sense tsunami", 
+        x = "Magnitud")
+
+plot_grid(g1, g2)
+```
+
+Es veu que els terratrèmols que provoquen tsunami tenen magnituds cap a la banda alta, els que no provoquen tsunami hi tenim un ventall més ampli de magnituds, (tenint en compte amb les dades amb les que treballem).
+
+Centrem-nos ara amb la relació entre magnitud i profunditat:
+```{r warning=FALSE}
+ggplot(dades_1900,
+       aes(x = FOCAL_DEPTH, y = EQ_PRIMARY, color = EQ_PRIMARY)) +
+  geom_point() +
+  labs(x = "Profunditat (km)", y = "Magnitud", color = "Magnitud")
+```
+
+S'observa la presència de terratrèmols de totes les magnituds per profunditats baixes (< 100 km), aquests són la majoria , però a partir dels 200 km de profunditat les magnituds són superiors a 6, i a partir dels 300 km la magnitud és superior a 7. (Caldria fer una mica de recerca per trobar alguna relació amb l'estructura de capes terrestres i límits de plaques tectòniques).
+
+Considerem els terratrèmols més profunds (profunditat > 200 km) i situem-los al mapa.
+```{r}
+earthq300 <- dades_1900 |> 
+  filter(FOCAL_DEPTH >= 200)
+
+world <- map_data('world') 
+
+title <- "Terratrèmols més profunds ( > 200 km)"
+wr <- map_data("world")
+
+p <- ggplot(earthq300) + 
+  geom_map(data = world, map = world, 
+           aes(map_id = region), 
+           fill="white", 
+           color="#7f7f7f") +
+  expand_limits(x = world$long, y = world$lat) +
+  geom_point(aes(x = LONGITUDE, y = LATITUDE, color = EQ_PRIMARY),
+             size = 3) + 
+  ggtitle(title) +
+  labs(x = "Longitud", y = "Latitud", color = "Magnitud") +
+  scale_colour_gradient(high = "#132B43", low = "lightblue")
+
+pngfile <- fs::path(knitr::fig_path(),  "mapa4.png")
+
+agg_png(pngfile, width = 25, height = 12, units = "cm", res = 300)
+plot(p)
+invisible(dev.off())
+knitr::include_graphics(pngfile)
+```
+
+Hem anat fent visualitzacions en el mapa, però ara volem especificar la relació dels terratrèmols amb la geografia, és a dir països on n'hi ha més i a on són més greus.
+
+Comencem amb amb els països on l'activitat sísmica és més gran, llistarem els 20 primers:
+```{r}
+top20_quant <- dades_1900  |>
+  group_by(COUNTRY) |> 
+  summarize(earthq_num = n()) |> 
+  filter(COUNTRY != "")  |> 
+  arrange(desc(earthq_num)) |> 
+  head(n = 20)
+
+# https://sebastiansauer.github.io/ordering-bars/
+ggplot(top20_quant, 
+       aes(x = reorder(COUNTRY, -earthq_num), y = earthq_num, 
+           fill = earthq_num)) + 
+  geom_bar(position = "dodge", stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  labs(title = "Països amb més nombre de terratrèmols", 
+       x = "País", y = "Nombre de terratrèmols",
+       fill = "Nombre terratrèmols") +
+  scale_fill_gradient(high = "#132B43", low = "lightblue")
+
+```
+
+Volem ara llistar els 20 pitjors terratrèmols en magnitud, a quines zones han passat:
+```{r}
+top20_mag <- dades_1900  |>
+ group_by(LOCATION_NAME , EQ_PRIMARY) |> 
+ filter(LOCATION_NAME != "") |> 
+ arrange(desc(EQ_PRIMARY)) |> 
+ head(n = 20)
+
+ ggplot(top20_mag, 
+        aes( x = reorder(LOCATION_NAME, -EQ_PRIMARY), y = EQ_PRIMARY,
+             fill = EQ_PRIMARY)) + 
+   geom_bar(position = "dodge", stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  labs(title = "Terratrèmols més forts", 
+       x = "Zona", y = "Magnitud",
+       fill = "Magnitud") +
+  scale_fill_gradient(high = "#132B43", low = "lightblue")
+```
+
+Els terratrèmols que han causat més morts, (que no han de coincidir amb els anteriors, és a dir amb els de més magnitud).
+```{r}
+top20_dead <- dades_1900  |>
+ group_by(LOCATION_NAME , DEATHS) |> 
+ filter(LOCATION_NAME != "") |> 
+ arrange(desc(DEATHS)) |> 
+ head(n = 20)
+
+ ggplot(top20_dead, 
+        aes( x = reorder(LOCATION_NAME, -DEATHS), y = DEATHS, fill = DEATHS)) + 
+   geom_bar(position = "dodge", stat = "identity") +
+   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+   labs(title = "Terratrèmols més mortals", 
+        x = "Zona", y = "Morts",
+        fill = "Morts") + 
+   scale_fill_gradient(high = "#132B43", low = "lightblue")
+```
+
+I els més destructius, (danys materials):
+```{r}
+top20_dam <- dades_1900  |>
+ group_by(LOCATION_NAME , DAMAGE_DESCRIPTION) |> 
+ filter(LOCATION_NAME != "") |> 
+ arrange(desc(DAMAGE_DESCRIPTION)) |> 
+ head(n = 20)
+
+ ggplot(top20_dam, 
+        aes( x = reorder(LOCATION_NAME, -DAMAGE_DESCRIPTION), y = DAMAGE_DESCRIPTION, fill = DAMAGE_DESCRIPTION)) + 
+   geom_bar(position = "dodge", stat = "identity") +
+   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+   labs(title = "Terratrèmols més detructius", 
+        x = "Zona", y = "Index de destrucció",
+        fill = "Index de destrucció") + 
+   scale_fill_gradient(high = "#132B43", low = "lightblue")
+```
+
+Observacions:
+
+D'aquestes darreres 4 gràfiques es poden observar algunes característiques. Xina encapçala els països amb més nombre de terratrèmols, Japó també. En quant a magnitud, destaquem Xile, Indonèsia, Japó, Rússia (Kamtxatka) i Alaska. Si mirem el nombre de morts, Haití és el primer de la llista i no apareix a les llistes anteriors, això ens pot indicar que és una zona altament poblada i un país molt pobre. En aquesta llista de més mortalitat, no hi apareixen ni Kamtxatka ni Alaska (amb terratrèmols de gran magnitud), ja que són zones amb una densitat de població molt baixa.  
+En quant al llistat de la destrucció, llevat del terratrèmol de San Francisco a California a principis del segle passat, s'observa que en general els països que hi apareixen són majoritàriament països amb construccions més precàries, destacant però Japó que està més enrere, que com és conegut, és un dels països amb les millors mesures antisísmiques.
+
+Podem completar aquestes visualitzacions la relació entre el grau de danys relacionat amb la magnitud.
+```{r}
+# https://r-graph-gallery.com/2d-density-plot-with-ggplot2.html
+# https://stackoverflow.com/questions/43515112/reversing-default-scale-gradient-ggplot2
+top20_dam <- dades_1900  |>
+  group_by(DAMAGE_DESCRIPTION)
+
+ggplot(dades_1900, aes(x=EQ_PRIMARY, y=DAMAGE_DESCRIPTION)) +
+  geom_bin2d(bins = 10) +
+  scale_fill_continuous(high = "royalblue4", low = "steelblue1") +
+  labs(x = "Magnitud" , y = "Grau de danys")
+```
+
+D'aquesta visualització no podem treure gaires conclusions, ja hem vist que els danys i la magnitud depèn molt de la densitat de població i de la riquesa dels països, (primer món vs tercer món).
+
+## Codificació
+Creem  una nova variable numèrica a partir de FLAG_TSUNAMI, que pendrà valor 1 o 0 segons sigui "Yes" o "No"
+```{r}
+# Convertim Yes = 1, No = 0
+dades_netes <- dades_netes |> 
+  mutate(tsunami = ifelse(FLAG_TSUNAMI %in% c("No"), 0, 1))
+```
+
+## Correlacions
+
+Tot seguit cercarem correlacions en funció dels morts i altres variables que poden estar relacionades, (inclosa `tsunami` que acabem de crear). 
+```{r message=FALSE, warning=FALSE}
+# Utilitzem aquesta llibreria per fer servir la funcio multiplot()
+library('Rmisc')
+#Crearem primer una llista per mostrar les gràfiques de correlacions
+#Crearem una llista per mostrar els atributs que interessen.
+
+n = c("YEAR", "DAY", "HOUR", "tsunami", "FOCAL_DEPTH", "INTENSITY", "LATITUDE", "LONGITUDE", "EQ_PRIMARY", "DAMAGE_DESCRIPTION", "REGION_CODE") 
+dataAux <- dades_netes |> 
+  select(all_of(n))
+histList2<- vector('list', ncol(dataAux))
+for(i in seq_along(dataAux)){
+  message(i)
+histList2[[i]]<-local({
+  i<-i
+  col <- log(dataAux[[i]])
+  ggp <- ggplot(dataAux, 
+                aes(x = dades_netes$DEATHS, y=col)) + 
+    geom_point(color = "gray30") + 
+    geom_smooth(method = lm, color = "firebrick") + 
+    theme_bw() + xlab("Morts") + ylab(names(dataAux)[i])
+  })
+
+}
+multiplot(plotlist = histList2, cols = 4)
+```
+
+D'aquetes gràfiques podem veure:
+
+  - Un increment de les variables que indiquen els danys, la intensitat i la magnitud representen un augment de morts.
+  - Per les variables que fan referència a la localització (codi) i a l'any tenim una correlació negativa, pel primer cas pot ser justificable, ja que hi haurà països o zones de menor sismicitat o amb terratrèmols menys greus, però el cas dels anys no tinc explicació, (podria ser degut a la neteja de les dades que hem fet).
+  - Per les altres variables no podem treure cap conclusió.
+  
+La matriu de correlacions la podem visualitzar amb la funció `corrplot`.
+
+```{r message=FALSE}
+# https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.html
+library("corrplot")
+
+n = c("YEAR", "DAY", "HOUR", "tsunami", "FOCAL_DEPTH", "INTENSITY", "EQ_PRIMARY", "LATITUDE", "LONGITUDE", "DEATHS", "REGION_CODE", "DAMAGE_DESCRIPTION")  
+
+factors <- dades_netes |> 
+  select(all_of(n))
+
+# https://stackoverflow.com/questions/14674431/error-in-eigencorr-infinite-or-missing-values-in-x-when-making-a-correlat
+res <- cor(factors, use = "complete.obs")
+corrplot(res, 
+         method = "color", 
+         tl.col = "black", 
+         tl.srt = 30, 
+         order = "AOE",
+         number.cex = 0.75,
+         sig.level = 0.01, 
+         addCoef.col = "black")
+```
+
+No veiem cap correlació significativa, a part de les comentades anteriorment, que en pugui permetre eliminar cap de les variables. 
+
+# Construcció del conjunt de dades
+
+No hem trobat cap correlació significativa de manera que poguem eliminar variables, per tant considerem que el nostre model no té informació que el pugui debilitar.
+Hem afegit una variable numèrica nova `tsunami` que pren valors 0 /1, i és simplement la codificació de la variable `FLAG_TSUNAMI` que pren valors "Yes" / "No". Les altres variables són exactament les mateixes que hem mostrat després de la neteja.
+
+## Discretització
+
+Abans hem vist la relació entre magnitud i profunditat, el que farem ara és discretitzar la variable **FOCAL_DEPTH**, la profunditat. Ho farem seguint la divisió que fa [USGS](https://www.usgs.gov/programs/earthquake-hazards/determining-depth-earthquake) dels terratrèmols:
+
+  - **Shallow** (superficials): de 0 a 70 km.
+  - **Intermediate** (intermedis): de 70 km a 300 km.
+  - **Deep** (profunds): de 300 km a 700 km.
+
+```{r}
+summary(dades_netes[,"FOCAL_DEPTH"])
+```
+
+```{r}
+dataAux["depth"] <- cut(dataAux$FOCAL_DEPTH, breaks = c(0, 70, 300, 700), labels = c("Shallow", "Intermediate", "Deep"))
+head(dataAux$depth)
+```
+
+```{r}
+plot(dataAux$depth,
+     main = "Nombre de terratrèmols per segment de profunditat", 
+     xlab = "Segment de profunditat", ylab = "Quantitat", 
+     col = "red4")
+```
+
+## Normalització
+
+Tot seguit normalitzem (per la diferència), les variables per tal que cada variable contribueixi per igual al nostre anàlisi.
+```{r}
+# Definim la funció de normalització
+ nor <- function(x) {(x -min(x))/(max(x)-min(x))}
+
+# Guardem un nou dataset normalitzat
+dades_netes$type<- NULL
+
+n = c("YEAR", "DAY", "HOUR", "tsunami", "FOCAL_DEPTH", "EQ_PRIMARY", "LATITUDE", "LONGITUDE", "DEATHS", "REGION_CODE", "DAMAGE_DESCRIPTION")
+
+dades_netes <- dades_netes |>  
+  select(all_of(n))
+
+dades_netes_nor <- as.data.frame(lapply(dades_netes, nor))
+ head(dades_netes_nor)
+```
+
+# Procés de PCA
+
+**Nota:** Aquest estudi el fem seguint la PAC1 i també [STDA-PCA](
+http://www.sthda.com/english/articles/31-principal-component-methods-in-r-practical-guide/112-pca-principal-component-analysis-essentials/#visualization-and-interpretation)  
+
+Volem treballar amb noves característiques anomenades components principals, independents entre sí. Això ens permet representar el joc de dades en un nou sistema de coordenades, format per aquestes components principals. Aquest sistema està més ben adaptat a la distribució del joc de dades, de manera que recull millor la seva variabilitat, són noves variables que s'obtenen de combinacions lineals o barreges de les variables inicials, de manera que aquestes components principals, en particular les primeres retenen la major part de la informació.
+
+Apliquem PCA a les columnes del nostre dataset, ho fem primer executant la funció `prcomp()`.
+```{r}
+pca.earthq <- prcomp(dades_netes_nor)
+summary(pca.earthq)
+```
+
+La funció `summary()`, ens mostra la proporció de variància aplicada al conjunt total de cada atribut. Podem veure que l’atribut 1 explica el 0.2511 de variabilitat del total de dades, en canvi l’atribut 7 explica només el 0.04883.
+
+El següent histograma mostra el pes de cada atribut sobre el conjunt total de dades:
+```{r message=FALSE}
+library('factoextra')
+
+#Els valors propis corresponen a la quantitat de variació explicada per cada component principal (PC).
+ev= get_eig(pca.earthq)
+ev
+fviz_eig(pca.earthq)
+```
+
+Seguint el guió de la PAC1, volem utilitzar el mètode de Kàiser per decidir quina de les variables obtingudes farem servir. Aquest criteri manté totes les variables la variància de les quals és superior a 1.
+```{r}
+# Calculem la variància dels components principals a partir de la desviació estàndard
+
+var_earthq <- pca.earthq$sdev^2
+
+var_earthq
+```
+
+Aquests valors obtinguts no ens deixen clar quines components hem de considerar. Per ajudar-nos a triar-les, escalem les dades, cosa que no havíem fet abans i tornem a calcular la variància.
+```{r}
+# Escalem les dades
+earthq_scale <- scale(dades_netes_nor)
+# Calculem les components principals
+pca.earthq_scale <- prcomp(earthq_scale)
+# Mostramos la varianza de dichas variables:
+var_earthq_scale <- pca.earthq_scale$sdev^2
+head(var_earthq_scale)
+```
+
+Després d’analitzar la variància i aplicant el criteri de Kàiser ens quedarem amb les components principals 1, 2, 3, 4 i 5 que són les superiors a 1. Aquest criteri té el problema de sobreestimar el nombre de factors, però malgrat això és el que aplicarem per analitzar els resultats.
+
+Mostrem l’histograma de percentatge de variància explicat amb les dades escalades:
+```{r}
+fviz_eig(pca.earthq_scale)
+```
+
+```{r}
+ev = get_eig(pca.earthq_scale)
+ev
+```
+
+Aquesta taula s'interpreta de la següent manera, la suma de tots els valors propis és 11. Així considerant el primer valor propi, 2.0645709 i dividint-lo per 11, obtenim el 18.768827 percent de la tercera columna i la darrera és la suma dels valors anteriors acumulats.
+
+Aquests valors propis es poden utilitzar per determinar el nombre de components principals a retenir després de la PCA (Kaiser 1961):
+  
+  - Un valor propi > 1 indica que els PCs representen més variància de la que representa una de les variables originals de les dades estandarditzades. Això s’utilitza habitualment com a punt de tall per al qual es conserven els PCs. Això només és cert quan les dades estan estandarditzades.
+  - També podem limitar el nombre de components a aquest nombre que representa una determinada fracció de la variància total. Per exemple, si estem satisfets amb el 80% de la variància total explicada, fem servir el nombre de components per aconseguir-ho que són les 4 components principals vists abans.
+
+Observem que les 5 primeres components principals expliquen el 62.6% de la variació. És un valor una mica baix, però en aquest cas, per les dades que tenim ho donem per bo.
+
+Així, després d’aplicar el mètode Kàiser ens quedem amb 5 components principals. Per obtenir els resultats d'aquestes 5 variables del que ens ha donat la sortida del PCA, fem servir la funció `get_pca_var()` (*factoextra package*). Aquesta funció ens dona una llista de matrius que contenen el resultat de les variables considerades (coordenades, correlació entre variables i eixos, cosinus al quadrat i contribucions).
+```{r}
+var <- get_pca_var(pca.earthq_scale)
+var
+```
+
+Els components de get_pca_var() es poden utilitzar en el diagrama de variables de la següent manera:
+
+-   **var\$coord**: coordenades de variables per crear un diagrama de dispersió.
+-   **var\$cos2**: representa la qualitat de representació de les variables al mapa de factors. Es calcula com les coordenades al quadrat:  
+`var.cos2 = var.coord \* var.coord`.
+-   **var\$contrib**: conté les contribucions (en percentatge) de les variables als components principals. La contribució d'una variable (var) a un determinat component principal és (en percentatge): `(var.cos2 \* 100) / (cos2 total del component)`.
+
+```{r}
+#Utilitzem els 5 components principals trobats abans
+head(var$coord[,1:5],11)
+```
+
+## Qualitat de la representació
+
+La qualitat de representació de les variables en el mapa de factors s'anomena cos2 (cosinus quadrat, coordenades quadrades). Podem accedir al cos2 de la següent manera:
+```{r}
+head(var$cos2[,1:5],11)
+```
+
+Podem visualitzar el `cos2` de les variables en totes les dimensions amb el paquet *corrplot*:
+```{r}
+corrplot(var$cos2[,1:5], is.corr=FALSE)
+```
+
+També podem crear un diagrama de barres de variables `cos2` amb la funció `fviz_cos2()`:
+```{r}
+fviz_cos2(pca.earthq_scale, choice = "var", axes = 1:2)
+```
+
+**Nota**:
+
+-   Un cos2 elevat indica una bona representació de la variable en el component principal. En aquest cas, la variable es dibuixada prop de la circumferència del cercle de correlació.
+
+-   Un cos2 baix indica que la variable no està perfectament representada pels PC. En aquest cas, la variable està a prop del centre del cercle.
+
+Per a una variable donada, la suma del cos2 de tots els components principals és igual a 1.
+
+Si una variable està perfectament representada per només dos components principals (Dim.1 i Dim.2), la suma del cos2 en aquests dos PCs és igual a un. En aquest cas les variables es col·locaran en el cercle de correlacions.
+
+Per a algunes de les variables, poden ser necessaris més de 2 components per representar perfectament les dades. En aquest cas les variables es situen dins del cercle de correlacions.
+
+**Resumint:**
+
+-   Els valors de cos2 s'utilitzen per estimar la qualitat de la representació
+-   Com més propera estigui una variable al cercle de correlacions, millor serà la seva representació al mapa de factors (i més important és interpretar aquests components)
+-   Les variables que estan properes al centre de la trama són menys importants per als primers components.
+
+```{r}
+fviz_pca_var(pca.earthq_scale,
+             col.var = "cos2", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     
+             )
+```
+
+## Contribució
+
+Les contribucions de les variables en la comptabilització de la variabilitat d'un determinat component principal s'expressen en percentatge.
+
+-   Les variables que estan correlacionades amb PC1 (és a dir, Dim.1) i PC2 (és a dir, Dim.2) són les més importants per explicar la variabilitat en el conjunt de dades.
+
+-   Les variables que no estan correlacionades amb cap PC o amb les darreres dimensions són variables amb una contribució baixa i es poden eliminar per simplificar l'anàlisi global.
+
+La contribució de les variables es pot extreure de la següent manera:
+```{r}
+head(var$contrib[,1:5],11)
+```
+
+Quant més gran sigui el valor de la contribució, més aportació de la variable hi haurà al component.
+```{r}
+corrplot(var$contrib[,1:5], is.corr=FALSE)
+```
+
+Les variables més importants (que més contribueixen) es poden ressaltar a la gràfica de correlació de la següent manera:
+```{r}
+fviz_pca_var(pca.earthq_scale, col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07")
+             )
+```
+
+Les variables que apunten al mateix costat del gràfic estan correlacionades de manera positiva, i les que apunten a costats oposats del gràfic ho estan negativament.  
+Així, podem fer les següents observacions:
+
+-   La variable **EQ_PRIMARY**, (magnitud, és la que més aporta), està força correlacionada amb **tsunami**, a la matriu de correlacions s'ha vist que tenia un valor de 0.52. De fet és normal ja que aquesta darrera indica la presència d'un terratrèmol d'una certa magnitud. Ara bé, no vol dir que sempre hi ha tsunamis, això depèn d'altres factors, principalment de si és una zona marítima.
+-   Una altra correlació és entre **DEATHS** i **DAMAGE_DESCRIPTION**, és a dir els danys i els morts per terratrèmols estan relacionats.
+-   Les quatre variables anteriors apunten a la mateixa direcció i per tant poden formar un indicador de la gravetat i destrucció d'un terratrèmol.
+-   Si ara ens fixem amb **FOCAL_DEPTH** i **REGION_CODE**, també tenen una correlació positiva. Potser podria indicar alguna característica geològica de les zones on han passat els sismes. 
+-   **YEAR** està correlacionada d'una manera negativa amb les 4 anteriors, en principi no treurem conclusions clares ja que hem fet una neteja exhaustiva, potser pot tenir relació amb que amb anys més recents tenim més dades.
+-   En quant a **LONGITUDE** i **LATITUDE**, formen una parella que ens serveixen per situar els sismes en el mapa.
+
+# Conclusions
+
+Hem treballat amb un dataset, *Global Significant Earthquake Database from 2150BC*, que és un llistat d’uns 6000 terratrèmols significatius que van del 2150 BC fins a l’actualitat. Aquests terratrèmols (registres) tenen un identificador únic i una sèrie de variables que el descriuen: variables temporals que en donen informació de quan van passar els sismes, variables que descriuen les característiques de terratrèmol, variables geogràfiques i variables que descriuen els efectes i danys sobre les persones i les infraestructures.  
+
+Al ser un dataset amb una gran presència de valors nuls, hem hagut de descartar una gran quantitat de registres, de fet hem considerat la sismicitat significativa a partir de l'any 1900, que és quan l'increment de les dades disponibles va augmentant, i hem netejat les variables que més ens han interessat, mantenint la resta. Això ha minvat la qualitat de les dades, tot i així ens ha permès seguir amb l'estudi. (Val a dir que amb paciència es podria cercar o construir un dataset més complet).  
+Ens hem quedat al final amb 1135 registres, (tot i que per alguna gràfica, en particular els mapes hem fet servir més punts per posar de manifest algunes estructures o regularitats).  
+
+Hem vist que esl terratrèmols estan distribuïts seguint els límits de les plaques tectòniques i que alguns d'ells, els que estan en zones marítimes desencadenen tsunamis. Aquests provoquen un augment de morts, però com que el nombre de terratrèmols sense tsunami és molt més superior, la mortalitat també ho és.  
+S'ha vist que els terratrèmols amb tsunami generalment tenen magnitud superior a 6 aproximadament.
+
+També hem vist que l'increment de la magnitud del terratrèmol incrementa el nombre de víctimes, però a la vegada s'observa la presència de magnituds elevades amb pocs morts, això ens indica que la densitat de població pot ser un factor important.
+
+Visualitzant la relació entre la magnitud i la profunditat hem pogut determinar que els terratrèmols  a una profunditat superior a 300 km, la magnitud és més gran que 7.
+
+Posant noms als països amb més nombre de terratrèmols i les zones amb els més forts, mortals i destructius hem deduït que factors com la densitat de població i riquesa i desenvolupament dels països afectats poden influir en el nombre de morts i danys ocasionats.
+
+Finalment, amb l'estudi PCA hem vist una sèrie de relacions que hem comentat i també que amb una nova variable combinació d’altres amb una correlació inicial, es podria considerar com un índex de devastació o destrucció d'un terratrèmol (significatiu).
